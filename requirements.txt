@@ -1,0 +1,8 @@
+# Python Dependencies for Lambda Streaming Function
+#
+# This implementation uses only Python standard library (http.client, json, time, etc.)
+# No external dependencies are required.
+#
+# If you want to use alternative approaches, you could add:
+# requests==2.31.0
+# urllib3==2.1.0
