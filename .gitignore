@@ -1,0 +1,21 @@
+# Build artifacts
+function.zip
+*.zip
+
+# Python layer build directory
+python-layer/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Conda
+.conda/
