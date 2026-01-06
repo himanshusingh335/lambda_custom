@@ -1,0 +1,18 @@
+#!/bin/sh
+# AWS Lambda Custom Runtime Bootstrap
+# Entry point that AWS Lambda invokes to start the runtime
+
+cd $LAMBDA_TASK_ROOT
+
+# Configure Python from Lambda Layer (extracted to /opt)
+export PYTHONHOME=/opt
+export LD_LIBRARY_PATH=/opt/lib:/var/lang/lib:$LD_LIBRARY_PATH
+export PYTHONPATH=/opt/lib/python3.11:/opt/lib/python3.11/lib-dynload:$PYTHONPATH
+
+if [ -x /opt/bin/python3.11 ]; then
+    exec /opt/bin/python3.11 runtime.py
+else
+    echo "ERROR: Python 3.11 not found in layer" >&2
+    echo "Expected: /opt/bin/python3.11" >&2
+    exit 127
+fi
