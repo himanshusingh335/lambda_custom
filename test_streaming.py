@@ -39,7 +39,7 @@ def test_streaming_lambda():
             if 'PayloadChunk' in event_item:
                 # Decode and print chunk
                 chunk = event_item['PayloadChunk']['Payload'].decode('utf-8')
-                print(chunk, end='', flush=True)
+                print(chunk, end='\n', flush=True)
                 chunk_count += 1
 
             elif 'InvokeComplete' in event_item:

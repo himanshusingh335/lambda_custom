@@ -1,6 +1,5 @@
 # Build artifacts
 function.zip
-*.zip
 
 # Python layer build directory
 python-layer/
