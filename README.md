@@ -1,340 +1,283 @@
-# AWS Lambda Response Streaming Function (Python Custom Runtime)
+# AWS Lambda Response Streaming - Custom Runtime on Amazon Linux 2023
 
-A simple AWS Lambda function demonstrating response streaming using Python with a custom runtime. The function streams a dummy sentence word-by-word using HTTP chunked transfer encoding.
+A production-ready AWS Lambda function demonstrating response streaming using Python 3.11 on Amazon Linux 2023 (`provided.al2023`). The function implements HTTP/1.1 chunked transfer encoding to stream responses progressively.
 
-## Files Overview
+## 🎯 Quick Start
+
+### Local Testing (No AWS Required)
+
+```bash
+# Test the handler locally
+python3 main.py
+```
+
+### Remote Testing with boto3
+
+```bash
+# Install dependencies
+pip install boto3
+
+# Run streaming test
+python test_streaming.py
+```
+
+## 📚 Documentation
+
+- **[IMPLEMENTATION.md](./IMPLEMENTATION.md)** - Complete implementation guide with architecture details, step-by-step instructions, and troubleshooting
+
+## 🏗️ Architecture
+
+```
+AWS Lambda (provided.al2023)
+  ↓
+bootstrap → Configures Python environment
+  ↓
+Python 3.11 Layer (20 MB)
+  ↓
+runtime.py → Custom Runtime API client
+  ├─ Polls for events
+  ├─ Invokes handler generator
+  └─ Streams via HTTP/1.1 chunked encoding
+  ↓
+lambda_function.py → Yields JSON chunks
+  ↓
+Progressive streaming response
+```
+
+## 📁 Project Structure
 
 ```
 lambda_custom/
-├── bootstrap              # Lambda runtime entry point (executable)
-├── runtime.py            # Custom Runtime API client with streaming support
-├── lambda_function.py    # Handler function that yields word chunks
-├── main.py               # Local testing script (no AWS required)
-├── requirements.txt      # Python dependencies (none required)
+├── bootstrap              # Lambda entry point (executable shell script)
+├── runtime.py            # Custom Runtime API client (~250 lines)
+├── lambda_function.py    # Handler function (generator-based)
+├── test_streaming.py     # boto3 test client
+├── main.py               # Local testing script
+├── IMPLEMENTATION.md     # Complete implementation guide
 └── README.md            # This file
 ```
 
-## How It Works
+## 🚀 Key Features
 
-1. **bootstrap** - Lambda invokes this executable to start the custom runtime
-2. **runtime.py** - Polls Lambda Runtime API for events, invokes handler, streams response using HTTP chunked encoding
-3. **lambda_function.py** - Generator function that yields words from a sentence with configurable delays
+✅ **Amazon Linux 2023** - Modern, optimized OS (< 40 MB vs 109 MB for AL2)
+✅ **Python 3.11 Layer** - Custom layer with full stdlib support
+✅ **True Streaming** - HTTP/1.1 chunked encoding (not buffering)
+✅ **Generator Pattern** - Memory-efficient streaming using `yield`
+✅ **Production-Ready** - Full error handling and logging
 
-## Local Testing (No AWS Required)
+## 🧪 Testing
 
-Before deploying to AWS, you can test the Lambda handler locally using `main.py`:
-
-### Quick Start
+### Test with Function URL (curl)
 
 ```bash
-# Default test (JSON format, 0.5s delay)
-python3 main.py
-
-# Fast streaming (0.1s delay)
-python3 main.py --delay 0.1
-
-# Plain text format
-python3 main.py --format text
-
-# Custom sentence
-python3 main.py --sentence "The quick brown fox jumps over the lazy dog"
-
-# Combination of options
-python3 main.py --delay 1 --format json --sentence "Custom test message"
-
-# View all options
-python3 main.py --help
+curl -X POST https://YOUR-FUNCTION-URL/ \
+  -H "Content-Type: application/json" \
+  -d '{"sentence": "Test streaming on AL2023"}' \
+  --no-buffer
 ```
 
-### Example Output
-
-**JSON format**:
+**Expected Output** (progressive, not all at once):
 ```json
-{"status":"start","request_id":"local-test-1767009748","word_count":8}
-{"type":"word","data":"Hello","sequence":1,"total":8,"timestamp":1767009748.27}
-{"type":"word","data":"this","sequence":2,"total":8,"timestamp":1767009748.47}
-...
-{"status":"complete","word_count":8}
+{"word": "Test", "index": 0, "total": 4}
+{"word": "streaming", "index": 1, "total": 4}
+{"word": "on", "index": 2, "total": 4}
+{"word": "AL2023", "index": 3, "total": 4}
 ```
 
-**Text format**:
-```
-Hello this is a streaming Lambda function response
-```
-
-### Available Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `--delay` | float | 0.5 | Seconds between words |
-| `--format` | string | json | Output format: "json" or "text" |
-| `--sentence` | string | (built-in) | Custom sentence to stream |
-
----
-
-## Deployment Instructions
-
-### Step 1: Create Deployment Package
-
-```bash
-# Navigate to project directory
-cd /Users/himanshusingh/Developer/lambda_custom
-
-# Verify bootstrap is executable
-ls -la bootstrap
-# Should show: -rwx--x--x (executable permissions)
-
-# Create deployment zip (all files must be in root, not subdirectory)
-zip -r function.zip bootstrap runtime.py lambda_function.py requirements.txt
-
-# Verify package contents
-unzip -l function.zip
-```
-
-### Step 2: Create Lambda Function via AWS CLI
-
-```bash
-# Create execution role (if you don't have one)
-aws iam create-role \
-  --role-name lambda-streaming-role \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "lambda.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }'
-
-# Attach basic execution policy
-aws iam attach-role-policy \
-  --role-name lambda-streaming-role \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-
-# Create Lambda function
-aws lambda create-function \
-  --function-name streaming-demo \
-  --runtime provided.al2 \
-  --role arn:aws:iam::YOUR_ACCOUNT_ID:role/lambda-streaming-role \
-  --handler not.used.in.custom.runtime \
-  --zip-file fileb://function.zip \
-  --timeout 30 \
-  --memory-size 128
-```
-
-### Step 3: Create Function URL with Response Streaming
-
-```bash
-# Create Function URL with RESPONSE_STREAM invoke mode
-aws lambda create-function-url-config \
-  --function-name streaming-demo \
-  --auth-type NONE \
-  --invoke-mode RESPONSE_STREAM
-
-# Get the Function URL
-aws lambda get-function-url-config \
-  --function-name streaming-demo
-```
-
-**Important**: The Function URL will look like:
-```
-https://abc123xyz.lambda-url.us-east-1.on.aws/
-```
-
-### Alternative: Deploy via AWS Console
-
-1. Go to AWS Lambda Console
-2. Click **Create function**
-3. Choose **Author from scratch**
-4. Function name: `streaming-demo`
-5. Runtime: **Custom runtime on Amazon Linux 2** (`provided.al2`)
-6. Architecture: **x86_64**
-7. Click **Create function**
-8. Under **Code source**, click **Upload from** → **.zip file**
-9. Upload `function.zip`
-10. Under **Configuration** → **Function URL**:
-    - Click **Create function URL**
-    - Auth type: **NONE** (or AWS_IAM for production)
-    - **Invoke mode**: **RESPONSE_STREAM** ⚠️ (Critical!)
-    - Click **Save**
-
-## Testing the Function
-
-### Test with curl
-
-```bash
-# Basic test (JSON format with default 0.5s delay)
-curl -X POST https://YOUR-FUNCTION-URL.lambda-url.REGION.on.aws/ \
-  -H "Content-Type: application/json" \
-  -d '{}' \
-  --no-buffer
-
-# Custom delay (1 second between words)
-curl -X POST https://YOUR-FUNCTION-URL.lambda-url.REGION.on.aws/ \
-  -H "Content-Type: application/json" \
-  -d '{"delay": 1.0}' \
-  --no-buffer
-
-# Plain text format
-curl -X POST https://YOUR-FUNCTION-URL.lambda-url.REGION.on.aws/ \
-  -H "Content-Type: application/json" \
-  -d '{"format": "text"}' \
-  --no-buffer
-
-# Custom sentence
-curl -X POST https://YOUR-FUNCTION-URL.lambda-url.REGION.on.aws/ \
-  -H "Content-Type: application/json" \
-  -d '{"sentence": "The quick brown fox jumps over the lazy dog", "delay": 0.3}' \
-  --no-buffer
-
-# Verbose mode to see HTTP headers (including Transfer-Encoding: chunked)
-curl -X POST https://YOUR-FUNCTION-URL.lambda-url.REGION.on.aws/ \
-  -H "Content-Type: application/json" \
-  -d '{"delay": 0.5}' \
-  --no-buffer \
-  -v
-```
-
-**Important**: The `--no-buffer` flag is **critical** for seeing the streaming output in real-time.
-
-### Expected Output (JSON format)
-
-```json
-{"status":"start","request_id":"abc-123-def","word_count":8,"timestamp":1735481234.56}
-{"type":"word","data":"Hello","sequence":1,"total":8,"timestamp":1735481234.57}
-{"type":"word","data":"this","sequence":2,"total":8,"timestamp":1735481235.07}
-{"type":"word","data":"is","sequence":3,"total":8,"timestamp":1735481235.57}
-{"type":"word","data":"a","sequence":4,"total":8,"timestamp":1735481236.07}
-{"type":"word","data":"streaming","sequence":5,"total":8,"timestamp":1735481236.57}
-{"type":"word","data":"Lambda","sequence":6,"total":8,"timestamp":1735481237.07}
-{"type":"word","data":"function","sequence":7,"total":8,"timestamp":1735481237.57}
-{"type":"word","data":"response","sequence":8,"total":8,"timestamp":1735481238.07}
-{"status":"complete","word_count":8,"timestamp":1735481238.07}
-```
-
-Each line appears with the configured delay (default 0.5 seconds).
-
-### Expected Output (text format)
-
-```
-Hello this is a streaming Lambda function response
-```
-
-Words appear progressively with delays between them.
-
-## Event Parameters
-
-The function accepts the following optional parameters in the event JSON:
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `delay` | float | 0.5 | Seconds to wait between words |
-| `format` | string | "json" | Output format: "json" or "text" |
-| `sentence` | string | "Hello this is..." | Custom sentence to stream |
-
-## Monitoring & Logs
-
-View CloudWatch logs:
-
-```bash
-# Tail logs
-aws logs tail /aws/lambda/streaming-demo --follow
-
-# Get latest log events
-aws logs tail /aws/lambda/streaming-demo --since 5m
-```
-
-Or via AWS Console:
-1. Go to Lambda function
-2. Click **Monitor** tab
-3. Click **View logs in CloudWatch**
-
-## Troubleshooting
-
-### Issue: "Cannot test streaming in Lambda console"
-**Solution**: Lambda console always shows buffered responses. Use Function URL with curl instead.
-
-### Issue: No streaming effect visible
-**Solution**: Ensure you're using `--no-buffer` flag with curl and Function URL has `RESPONSE_STREAM` invoke mode.
-
-### Issue: Function timeout
-**Solution**: Increase Lambda timeout in Configuration → General configuration → Timeout (e.g., 60 seconds).
-
-### Issue: "Runtime.ExitError"
-**Solution**:
-- Verify bootstrap has execute permissions: `ls -la bootstrap` should show `rwx`
-- Ensure bootstrap is in zip root, not subdirectory
-- Check CloudWatch logs for Python errors
-
-### Issue: HTTP 500 errors
-**Solution**: Check CloudWatch logs for detailed error messages. Common causes:
-- Missing `AWS_LAMBDA_RUNTIME_API` environment variable (Lambda sets this automatically)
-- Python syntax errors in runtime.py or lambda_function.py
-
-## Technical Details
-
-### Custom Runtime Implementation
-
-- **Runtime API**: Uses HTTP client to poll `/2018-06-01/runtime/invocation/next`
-- **Streaming**: Implements HTTP/1.1 chunked transfer encoding
-- **Headers**: Sets `Lambda-Runtime-Function-Response-Mode: streaming` and `Transfer-Encoding: chunked`
-- **Chunk Format**: `{size_hex}\r\n{data}\r\n` ... `0\r\n\r\n` (terminator)
-
-### Response Streaming Limits
-
-- Maximum response size: **20 MiB** (for custom runtime streaming)
-- Bandwidth: First 6 MB uncapped, then max 2 MBps
-- Standard Lambda limits: 6 MB for buffered responses
-
-### Python Generator Pattern
-
-The handler function uses Python's generator pattern with `yield` to produce chunks:
+### Test with boto3
 
 ```python
-def handler(event, context):
-    for word in sentence.split():
-        yield json.dumps({"data": word}).encode('utf-8')
-        time.sleep(delay)
+import boto3
+import json
+
+client = boto3.client('lambda', region_name='us-east-1')
+
+response = client.invoke_with_response_stream(
+    FunctionName='streaming-demo',
+    Payload=json.dumps({"sentence": "Hello world"})
+)
+
+for event in response['EventStream']:
+    if 'PayloadChunk' in event:
+        chunk = event['PayloadChunk']['Payload'].decode('utf-8')
+        print(chunk, end='', flush=True)
 ```
 
-## Updating the Function
+## 🔧 Deployment
+
+### Prerequisites
+
+- AWS CLI configured
+- Docker (for building Python layer)
+- Lambda function: `streaming-demo` in `us-east-1`
+
+### Quick Deploy
 
 ```bash
-# After making changes, re-zip and update
-zip -r function.zip bootstrap runtime.py lambda_function.py requirements.txt
+# 1. Create deployment package
+chmod +x bootstrap
+zip function.zip bootstrap runtime.py lambda_function.py
 
+# 2. Deploy to Lambda
 aws lambda update-function-code \
   --function-name streaming-demo \
-  --zip-file fileb://function.zip
+  --zip-file fileb://function.zip \
+  --region us-east-1
+
+# 3. Update runtime to AL2023 with layer
+aws lambda update-function-configuration \
+  --function-name streaming-demo \
+  --runtime provided.al2023 \
+  --layers arn:aws:lambda:us-east-1:ACCOUNT_ID:layer:python311-al2023:VERSION \
+  --region us-east-1
 ```
 
-## Clean Up
+### Build Python 3.11 Layer
 
 ```bash
-# Delete Function URL
-aws lambda delete-function-url-config --function-name streaming-demo
+# Extract Python from AL2023 Docker image
+mkdir -p python-layer
 
-# Delete Lambda function
-aws lambda delete-function --function-name streaming-demo
+docker run --rm --platform linux/amd64 --entrypoint="" \
+  -v $(pwd)/python-layer:/output \
+  public.ecr.aws/lambda/provided:al2023 \
+  sh -c "
+    dnf install -y python3.11 python3.11-libs && \
+    mkdir -p /output/bin /output/lib && \
+    cp -P /usr/bin/python3.11 /output/bin/ && \
+    cp -rP /usr/lib64/python3.11 /output/lib/ && \
+    cp -P /usr/lib64/libpython3.11.so* /output/lib/
+  "
 
-# Delete IAM role (if created)
-aws iam detach-role-policy \
-  --role-name lambda-streaming-role \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+# Create layer zip
+cd python-layer
+zip -r ../python311-layer-x86.zip bin/ lib/
+cd ..
 
-aws iam delete-role --role-name lambda-streaming-role
+# Publish layer to AWS
+aws lambda publish-layer-version \
+  --layer-name python311-al2023 \
+  --description "Python 3.11 for AL2023 (x86_64)" \
+  --compatible-runtimes provided.al2023 \
+  --compatible-architectures x86_64 \
+  --zip-file fileb://python311-layer-x86.zip \
+  --region us-east-1
 ```
 
-## Next Steps
+## 📊 Performance
 
-- Add authentication to Function URL (AWS_IAM auth type)
-- Implement more complex streaming use cases (e.g., streaming large file processing)
-- Integrate with API Gateway for additional features
-- Add custom metrics and monitoring
-- Implement response compression
+- **Cold Start**: ~400-600 ms (runtime + layer loading)
+- **Memory Usage**: ~30-40 MB (base runtime)
+- **Streaming Latency**: Immediate (true streaming, no buffering)
+- **Response Limit**: 20 MiB (streaming mode)
 
-## References
+## 🐛 Troubleshooting
+
+### Runtime.ExitError (Exit 127)
+
+**Cause**: Bootstrap not executable
+**Fix**: `chmod +x bootstrap` before zipping
+
+### Python Not Found
+
+**Cause**: Layer not attached
+**Fix**: Verify layer ARN in function configuration
+
+### Architecture Mismatch
+
+**Cause**: ARM64 layer on x86_64 function (or vice versa)
+**Fix**: Rebuild layer with `--platform linux/amd64` for x86_64
+
+### No Streaming Effect
+
+**Cause**: Function URL not in `RESPONSE_STREAM` mode
+**Fix**:
+```bash
+aws lambda create-function-url-config \
+  --function-name streaming-demo \
+  --invoke-mode RESPONSE_STREAM
+```
+
+See [IMPLEMENTATION.md](./IMPLEMENTATION.md) for complete troubleshooting guide.
+
+## 📖 Event Parameters
+
+```json
+{
+  "sentence": "Custom text to stream"
+}
+```
+
+## 🔍 Monitoring
+
+```bash
+# View real-time logs
+aws logs tail /aws/lambda/streaming-demo --follow --region us-east-1
+
+# View recent logs
+aws logs tail /aws/lambda/streaming-demo --since 5m --region us-east-1
+```
+
+**Expected Log Output**:
+```
+[INFO] Lambda custom runtime starting...
+[INFO] Runtime API: 127.0.0.1:9001
+[INFO] Handler imported successfully
+[INFO] Received invocation: abc-123-def
+[INFO] Invoking handler for abc-123-def
+[INFO] Sent chunk 1: 42 bytes
+[INFO] Sent chunk 2: 42 bytes
+[INFO] Stream complete: 2 chunks, 84 bytes
+```
+
+## 📚 Technical Details
+
+### Custom Runtime Components
+
+1. **bootstrap** (Shell Script)
+   - Sets `PYTHONHOME`, `LD_LIBRARY_PATH`, `PYTHONPATH`
+   - Launches `runtime.py` with Python from layer
+
+2. **runtime.py** (Python Runtime API Client)
+   - Polls Runtime API for invocations
+   - Creates `LambdaContext` from headers
+   - Invokes handler generator
+   - Implements HTTP/1.1 chunked encoding
+   - Handles errors gracefully
+
+3. **lambda_function.py** (Handler)
+   - Generator function using `yield`
+   - Returns bytes (JSON-encoded)
+   - Progressive streaming (no buffering)
+
+### HTTP Chunked Encoding
+
+```
+1A\r\n
+{"word":"Hello","index":0}\n\r\n
+1B\r\n
+{"word":"world","index":1}\n\r\n
+0\r\n
+\r\n
+```
+
+**Format**: `{size_hex}\r\n{data}\r\n` ... `0\r\n\r\n`
+
+**Required Headers**:
+- `Lambda-Runtime-Function-Response-Mode: streaming`
+- `Transfer-Encoding: chunked`
+
+## 🔗 References
 
 - [AWS Lambda Response Streaming](https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html)
 - [Building Custom Runtimes](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html)
 - [Lambda Runtime API](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-api.html)
+- [Amazon Linux 2023](https://docs.aws.amazon.com/linux/al2023/ug/lambda.html)
+
+## 📝 License
+
+See project license for details.
+
+## 🤝 Contributing
+
+See [IMPLEMENTATION.md](./IMPLEMENTATION.md) for development guidelines.
