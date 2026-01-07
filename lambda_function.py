@@ -6,15 +6,6 @@ Streams a sentence word by word as JSON chunks
 import time
 import json
 import random
-import logging
-
-# Configure logger
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(levelname)s] %(message)s'
-)
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
 
 def lambda_handler(event, context=None):
@@ -37,8 +28,8 @@ def lambda_handler(event, context=None):
             "index": index,
             "total": len(words)
         }
-        logger.info(f"Word: {word}")  # Log to CloudWatch
-        yield (json.dumps(chunk) + '\n').encode('utf-8')
+        print(word, flush=True)  # Log to CloudWatch (PYTHONUNBUFFERED=1 ensures this works)
+        yield (json.dumps(chunk))
         # 80% chance of 0.5s, 20% chance of random between 0.5-2s
         sleep_duration = 0.5 if random.random() < 0.8 else random.uniform(0.5, 2.0)
         time.sleep(sleep_duration)
