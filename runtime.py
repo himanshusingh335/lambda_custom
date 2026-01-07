@@ -131,8 +131,6 @@ def stream_response(runtime_api, request_id, generator):
             conn.send(chunk)
             conn.send(b"\r\n")
 
-            logger.info(f"Sent chunk {chunk_count}: {chunk_size} bytes")
-
         # Send terminating chunk
         conn.send(b"0\r\n\r\n")
 

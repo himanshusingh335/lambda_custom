@@ -20,6 +20,9 @@ result = lambda_handler(event)
 
 # Print streamed output
 for chunk in result:
-    print(chunk.decode('utf-8'), end='', flush=True)
+    # Handle both strings and bytes
+    if isinstance(chunk, bytes):
+        chunk = chunk.decode('utf-8')
+    print(chunk, end='', flush=True)
 
 print()  # Final newline
