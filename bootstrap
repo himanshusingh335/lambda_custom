@@ -8,6 +8,7 @@ cd $LAMBDA_TASK_ROOT
 export PYTHONHOME=/opt
 export LD_LIBRARY_PATH=/opt/lib:/var/lang/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=/opt/lib/python3.11:/opt/lib/python3.11/lib-dynload:$PYTHONPATH
+export PYTHONUNBUFFERED=1
 
 if [ -x /opt/bin/python3.11 ]; then
     exec /opt/bin/python3.11 runtime.py
