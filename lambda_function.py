@@ -22,16 +22,16 @@ def lambda_handler(event, context=None):
     sentence = event.get('sentence', 'Hello world')
     words = sentence.split()
 
-    accumulated = []  # Track words to show sentence building up
     for index, word in enumerate(words):
         chunk = {
             "word": word,
             "index": index,
             "total": len(words)
         }
-        accumulated.append(word)
-        print(' '.join(accumulated), flush=True)  # Log to CloudWatch - shows sentence building up
         yield (json.dumps(chunk))
         # 80% chance of 0.5s, 20% chance of random between 0.5-2s
         sleep_duration = 0.5 if random.random() < 0.8 else random.uniform(0.5, 2.0)
         time.sleep(sleep_duration)
+
+    # Log the complete sentence after streaming is done
+    print(sentence, flush=True)
