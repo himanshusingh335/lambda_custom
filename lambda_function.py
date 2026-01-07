@@ -22,16 +22,18 @@ def lambda_handler(event, context=None):
     sentence = event.get('sentence', 'Hello world')
     words = sentence.split()
 
+    streamed_words = []  # Collect words as we stream them
     for index, word in enumerate(words):
         chunk = {
             "word": word,
             "index": index,
             "total": len(words)
         }
+        streamed_words.append(word)  # Collect the word being streamed
         yield (json.dumps(chunk))
         # 80% chance of 0.5s, 20% chance of random between 0.5-2s
         sleep_duration = 0.5 if random.random() < 0.8 else random.uniform(0.5, 2.0)
         time.sleep(sleep_duration)
 
-    # Log the complete sentence after streaming is done
-    print(sentence, flush=True)
+    # Log the complete sentence built from streamed words
+    print(' '.join(streamed_words), flush=True)
